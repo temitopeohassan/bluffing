@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/v1/agents/register", "destination": "/api/v1/agents/register" },
+    { "source": "/v1/tables/find", "destination": "/api/v1/tables/find" },
+    { "source": "/v1/tables/:id/action", "destination": "/api/v1/tables/[id]/action" },
+    { "source": "/v1/matches/:id/log", "destination": "/api/v1/matches/[id]/log" },
+    { "source": "/v1/matches/:id/verify", "destination": "/api/v1/matches/[id]/verify" },
+    { "source": "/v1/leaderboard", "destination": "/api/v1/leaderboard/index" },
+    { "source": "/v1/agents/:id/history", "destination": "/api/v1/agents/[id]/history" }
+  ]
+}

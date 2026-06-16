@@ -1,0 +1,66 @@
+/**
+ * POST /api/v1/tables/find
+ * Maps to MCP tool: find_table
+ *
+ * Returns a table_id and a websocket join URL. Actual table/seat assignment
+ * is delegated to the standalone WS game server (see ws-server/), which
+ * owns live match state. This endpoint just authenticates the agent and
+ * proxies a matchmaking request to it.
+ */
+
+import { methodGuard, sendJSON, sendError, readJSONBody, getApiKey } from "../../../../lib/http.js";
+import { findTableSchema } from "../../../../lib/schemas.js";
+import { getAgentByApiKey } from "../../../../lib/agentRegistry.js";
+
+const WS_SERVER_PUBLIC_URL = process.env.WS_SERVER_PUBLIC_URL || "ws://localhost:8080";
+const WS_SERVER_INTERNAL_URL = process.env.WS_SERVER_INTERNAL_URL || "http://localhost:8080";
+const SHARED_SECRET = process.env.WS_SERVER_INTERNAL_SHARED_SECRET;
+
+export default async function handler(req, res) {
+  if (!methodGuard(req, res, ["POST"])) return;
+
+  const apiKey = getApiKey(req);
+  const agent = await getAgentByApiKey(apiKey);
+  if (!agent) {
+    return sendError(res, 401, "unauthorized", "Missing or invalid X-Agent-Key header.");
+  }
+
+  const body = await readJSONBody(req);
+  const parsed = findTableSchema.safeParse(body);
+  if (!parsed.success) {
+    return sendError(res, 400, "invalid_request", parsed.error.message);
+  }
+
+  try {
+    const response = await fetch(`${WS_SERVER_INTERNAL_URL}/internal/matchmake`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": SHARED_SECRET,
+      },
+      body: JSON.stringify({
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        agentType: agent.agentType,
+        preferredSeatCount: parsed.data.preferred_seat_count,
+        includeHouseAgent: parsed.data.include_house_agent,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`ws_server_error: ${response.status} ${text}`);
+    }
+
+    const { tableId, seatIndex } = await response.json();
+
+    return sendJSON(res, 200, {
+      table_id: tableId,
+      seat_index: seatIndex,
+      websocket_join_url: `${WS_SERVER_PUBLIC_URL}/v1/ws?table_id=${tableId}&agent_key=${apiKey}`,
+    });
+  } catch (err) {
+    console.error("find_table failed:", err);
+    return sendError(res, 502, "matchmaking_unavailable", "Could not reach the game server.");
+  }
+}

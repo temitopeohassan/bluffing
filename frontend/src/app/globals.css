@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+:root {
+  /* --- Bluffline design tokens --- */
+  --bf-felt: #0f3d2e;          /* deep felt green — table surface */
+  --bf-felt-dark: #0a2920;     /* darker felt for depth/shadow */
+  --bf-ink: #0b0f0e;           /* near-black — base background, primary text on cream */
+  --bf-cream: #f2ead8;         /* card-stock cream — card faces, high-contrast panels */
+  --bf-cream-dim: #e6dcc4;     /* slightly muted cream for secondary surfaces */
+  --bf-brass: #c9a24b;         /* brass/gold — stakes, claims, the ladder, accents */
+  --bf-brass-bright: #e0bc6c;  /* hover/active state for brass elements */
+  --bf-tell: #b23a2e;          /* "tell" red — reserved ONLY for bluff-calls + verify failures */
+  --bf-slate: #6b7570;         /* muted secondary text on dark surfaces */
+  --bf-slate-on-cream: #7a7263;/* secondary text on cream surfaces */
+  --bf-line: rgba(242, 234, 216, 0.12); /* hairline dividers on dark surfaces */
+  --bf-line-on-cream: rgba(11, 15, 14, 0.12);
+
+  --background: var(--bf-ink);
+  --foreground: var(--bf-cream);
+}
+
+@theme inline {
+  --color-felt: var(--bf-felt);
+  --color-felt-dark: var(--bf-felt-dark);
+  --color-ink: var(--bf-ink);
+  --color-cream: var(--bf-cream);
+  --color-cream-dim: var(--bf-cream-dim);
+  --color-brass: var(--bf-brass);
+  --color-brass-bright: var(--bf-brass-bright);
+  --color-tell: var(--bf-tell);
+  --color-slate: var(--bf-slate);
+  --color-slate-on-cream: var(--bf-slate-on-cream);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Visible keyboard focus everywhere — never suppressed */
+:focus-visible {
+  outline: 2px solid var(--bf-brass);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Felt table texture — subtle radial vignette, no image asset needed */
+.felt-surface {
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 35%, var(--bf-felt) 0%, var(--bf-felt-dark) 100%);
+  position: relative;
+}
+
+.felt-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, transparent 1px, transparent 2px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0px, transparent 1px, transparent 2px);
+  pointer-events: none;
+}
+
+/* Hairline divider, the only "rule" style used across the app */
+.bf-hairline {
+  border-color: var(--bf-line);
+}
+
+.bf-hairline-cream {
+  border-color: var(--bf-line-on-cream);
+}
+
+/* Card face: cream stock with a thin brass edge */
+.bf-card-face {
+  background: var(--bf-cream);
+  color: var(--bf-ink);
+  border: 1px solid var(--bf-line-on-cream);
+  border-radius: 6px;
+}
+
+/* Card back: felt-toned with brass monogram */
+.bf-card-back {
+  background: linear-gradient(160deg, var(--bf-felt) 0%, var(--bf-felt-dark) 100%);
+  border: 1px solid rgba(201, 162, 75, 0.35);
+  border-radius: 6px;
+}
+
+.bf-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
