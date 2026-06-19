@@ -14,6 +14,7 @@ export interface AgentSession {
   apiKey: string;
   agentName: string;
   elo: number;
+  walletAddress?: string;
 }
 
 export function loadSession(): AgentSession | null {

@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { registerAgent, findTable, ApiError } from "@/lib/api";
 import { loadSession, saveSession, type AgentSession } from "@/lib/session";
+import { useWallet } from "@/lib/useWallet";
+
+function short(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
 
 export default function PlayLobbyPage() {
   const router = useRouter();
@@ -12,21 +17,33 @@ export default function PlayLobbyPage() {
   const [displayName, setDisplayName] = useState("");
   const [status, setStatus] = useState<"idle" | "registering" | "finding" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const wallet = useWallet();
+
+  const walletReady = !!wallet.address && wallet.onCorrectChain;
 
   async function handleSitDown() {
     setErrorMessage(null);
+    if (!walletReady) {
+      setErrorMessage("Connect a wallet on 0G testnet first.");
+      return;
+    }
     try {
       let activeSession = session;
 
       if (!activeSession) {
         setStatus("registering");
         const name = displayName.trim() || `Player ${Math.floor(Math.random() * 9000 + 1000)}`;
-        const result = await registerAgent({ agentName: name, agentType: "human" });
+        const result = await registerAgent({
+          agentName: name,
+          agentType: "human",
+          walletAddress: wallet.address ?? undefined,
+        });
         activeSession = {
           agentId: result.agent_id,
           apiKey: result.api_key,
           agentName: name,
           elo: result.starting_elo,
+          walletAddress: wallet.address ?? undefined,
         };
         saveSession(activeSession);
         setSession(activeSession);
@@ -54,14 +71,60 @@ export default function PlayLobbyPage() {
           <h1 className="font-display text-3xl text-ink mb-3">Take a seat</h1>
           <p className="text-ink/65 text-sm leading-relaxed mb-6">
             {session
-              ? `You're playing as ${session.agentName} (ELO ${session.elo}). We'll seat you with another player or The Dealer if no one's waiting.`
-              : "Pick a name for the table. We'll seat you with another player, or The Dealer if no one's waiting."}
+              ? `You're playing as ${session.agentName} (ELO ${session.elo}). Connect your wallet, and we'll seat you with another player or The Dealer.`
+              : "Connect a wallet on 0G testnet, pick a name, and we'll seat you with another player — or The Dealer if no one's waiting."}
           </p>
 
+          {/* Step 1 — wallet gate. Seats require a 0G-testnet wallet. */}
+          <div className="mb-5">
+            <span className="bf-mono text-[11px] uppercase tracking-wider text-slate-on-cream mb-1.5 block">
+              1 &middot; Wallet
+            </span>
+            {!wallet.hasProvider ? (
+              <a
+                href="https://metamask.io/download/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center border bf-hairline-cream rounded-sm px-3 py-2.5 text-ink/70 hover:border-ink/40 transition-colors text-sm"
+              >
+                No wallet detected — install MetaMask &rarr;
+              </a>
+            ) : walletReady ? (
+              <div className="flex items-center justify-between border border-felt/30 bg-felt/5 rounded-sm px-3 py-2.5">
+                <span className="bf-mono text-sm text-ink">{short(wallet.address!)}</span>
+                <span className="bf-mono text-[11px] text-felt">✓ 0G testnet</span>
+              </div>
+            ) : wallet.address && !wallet.onCorrectChain ? (
+              <button
+                type="button"
+                onClick={() => wallet.connect()}
+                disabled={wallet.connecting}
+                className="w-full border border-tell/50 bg-tell/10 text-ink rounded-sm px-3 py-2.5 text-sm hover:border-tell transition-colors disabled:opacity-50"
+              >
+                Wrong network — switch to 0G testnet
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => wallet.connect()}
+                disabled={wallet.connecting}
+                className="w-full bg-ink text-cream rounded-sm px-3 py-2.5 text-sm font-medium hover:bg-ink/85 transition-colors disabled:opacity-50"
+              >
+                {wallet.connecting ? "Connecting…" : "Connect wallet"}
+              </button>
+            )}
+            {wallet.error && (
+              <p className="text-tell text-xs mt-1.5" role="alert">
+                {wallet.error}
+              </p>
+            )}
+          </div>
+
+          {/* Step 2 — name (only when there's no saved identity yet) */}
           {!session && (
             <label className="block mb-5">
               <span className="bf-mono text-[11px] uppercase tracking-wider text-slate-on-cream mb-1.5 block">
-                Display name
+                2 &middot; Display name
               </span>
               <input
                 type="text"
@@ -83,12 +146,12 @@ export default function PlayLobbyPage() {
           <button
             type="button"
             onClick={handleSitDown}
-            disabled={isBusy}
-            className="w-full bg-felt text-cream font-medium py-3 rounded-sm hover:bg-felt-dark transition-colors disabled:opacity-50"
+            disabled={isBusy || !walletReady}
+            className="w-full bg-felt text-cream font-medium py-3 rounded-sm hover:bg-felt-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {status === "registering" && "Registering you at the table…"}
             {status === "finding" && "Finding an open seat…"}
-            {(status === "idle" || status === "error") && "Sit down"}
+            {(status === "idle" || status === "error") && (walletReady ? "Sit down" : "Connect wallet to sit down")}
           </button>
         </div>
       </section>

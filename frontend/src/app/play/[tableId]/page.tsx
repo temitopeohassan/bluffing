@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ClaimLadder } from "@/components/ClaimLadder";
 import { ActionPanel } from "@/components/ActionPanel";
 import { TableSeat } from "@/components/TableSeat";
+import { HowToPlay } from "@/components/HowToPlay";
 import { useMatchSocket } from "@/lib/useMatchSocket";
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_BASE_URL || "ws://localhost:8080/v1/ws";
@@ -89,7 +90,10 @@ export default function TablePage() {
             <p className="bf-mono text-xs text-cream/50">
               Table {params.tableId?.slice(0, 8)} &middot; {connected ? "connected" : "connecting…"}
             </p>
-            {!connected && <p className="bf-mono text-xs text-brass">Waiting on the game server…</p>}
+            <div className="flex items-center gap-4">
+              {!connected && <p className="bf-mono text-xs text-brass">Waiting on the game server…</p>}
+              <HowToPlay />
+            </div>
           </div>
 
           <div className="grid md:grid-cols-[1fr_220px] gap-8">
