@@ -8,12 +8,14 @@ import clsx from "clsx";
 export function ActionPanel({
   currentClaim,
   isYourTurn,
+  timeLimitSeconds,
   errorMessage,
   onSubmitClaim,
   onCallBluff,
 }: {
   currentClaim: Claim | null;
   isYourTurn: boolean;
+  timeLimitSeconds?: number | null;
   errorMessage?: string | null;
   onSubmitClaim: (claim: Claim) => void;
   onCallBluff: () => void;
@@ -43,6 +45,20 @@ export function ActionPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentClaim?.claim_type, currentClaim?.rank_threshold]);
 
+  // Per-turn countdown — restarts each time it becomes our turn.
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isYourTurn) {
+      setSecondsLeft(null);
+      return;
+    }
+    setSecondsLeft(timeLimitSeconds ?? 30);
+    const id = setInterval(() => {
+      setSecondsLeft((s) => (s === null ? null : Math.max(0, s - 1)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isYourTurn, timeLimitSeconds]);
+
   if (!isYourTurn) {
     return (
       <div className="flex items-center justify-center py-6 text-slate text-sm">
@@ -57,6 +73,22 @@ export function ActionPanel({
 
   return (
     <div className="flex flex-col gap-4 bf-card-face p-4 rounded-md">
+      <div className="flex items-center justify-between">
+        <p className="bf-mono text-[11px] uppercase tracking-wider text-felt font-medium">
+          Your turn
+        </p>
+        {secondsLeft !== null && (
+          <p
+            className={
+              "bf-mono text-sm tabular-nums " +
+              (secondsLeft <= 10 ? "text-tell font-medium" : "text-slate-on-cream")
+            }
+          >
+            {secondsLeft}s
+          </p>
+        )}
+      </div>
+
       <div>
         <p className="bf-mono text-[11px] uppercase tracking-wider text-slate-on-cream mb-2">
           Standing claim

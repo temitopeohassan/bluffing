@@ -31,6 +31,11 @@ const SHARED_SECRET = process.env.WS_SERVER_INTERNAL_SHARED_SECRET;
 const HOUSE_AGENT_ID = "the_dealer";
 // How long the showdown result stays up before the next deal (ms). Tunable.
 const SHOWDOWN_PAUSE_MS = 5000;
+// Per-turn time limit — a player who doesn't act in time forfeits the match.
+const TURN_LIMIT_MS = Number(process.env.TURN_LIMIT_MS) || 30000;
+const TURN_LIMIT_SECONDS = Math.round(TURN_LIMIT_MS / 1000);
+// Grace window after a disconnect to reconnect before forfeiting.
+const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 20000;
 
 // --- In-memory state owned by this process ---
 const tables = new Map(); // tableId -> { tableId, seats: [], match: Match|null, sockets: Map<seatIndex, ws> }
@@ -38,7 +43,7 @@ const waitingQueue = []; // tableIds with open seats, FIFO for simple matchmakin
 
 function createTable(preferredSeatCount) {
   const tableId = nanoid();
-  const table = { tableId, capacity: preferredSeatCount, seats: [], match: null, sockets: new Map() };
+  const table = { tableId, capacity: preferredSeatCount, seats: [], match: null, sockets: new Map(), turnTimer: null, disconnectTimers: new Map() };
   tables.set(tableId, table);
   waitingQueue.push(tableId);
   return table;
@@ -138,12 +143,51 @@ function notifyCurrentTurn(table) {
   const payload = {
     match_id: match.matchId,
     current_claim: match.currentClaim,
-    time_limit_seconds: 30,
+    time_limit_seconds: TURN_LIMIT_SECONDS,
   };
   if (ws && ws.readyState === ws.OPEN) {
     ws.send(JSON.stringify({ event: "your_turn", payload }));
   }
+  armTurnTimer(table);
   driveHouseAgentIfNeeded(table);
+}
+
+/**
+ * Arm a countdown for the current turn. A human seat that doesn't act within
+ * TURN_LIMIT_MS forfeits the match. The house agent self-drives, so it's exempt.
+ */
+function armTurnTimer(table) {
+  clearTimeout(table.turnTimer);
+  const { match } = table;
+  if (!match || match.status === "completed") return;
+  const turnSeat = match.currentTurnSeat;
+  const seatInfo = table.seats[turnSeat];
+  if (!seatInfo || seatInfo.agentId === HOUSE_AGENT_ID) return;
+  table.turnTimer = setTimeout(() => {
+    if (table.match === match && match.status !== "completed" && match.currentTurnSeat === turnSeat) {
+      forfeitSeat(table, turnSeat, "turn_timeout");
+    }
+  }, TURN_LIMIT_MS);
+}
+
+/**
+ * Forfeit a seat (left or timed out): they lose, remaining player(s) win.
+ * Ends the match if one or fewer seats remain.
+ */
+async function forfeitSeat(table, seatIndex, reason) {
+  const { match } = table;
+  if (!match || match.status === "completed") return;
+  clearTimeout(table.turnTimer);
+  table.turnTimer = null;
+
+  match.forfeit(seatIndex);
+  broadcast(table, "player_left", { match_id: match.matchId, seat_index: seatIndex, reason });
+
+  if (match.isMatchOver()) {
+    await finalizeMatch(table);
+  } else {
+    notifyCurrentTurn(table); // continue with remaining seats (>2-player tables)
+  }
 }
 
 /** Extremely simple built-in policy for The Dealer house agent. */
@@ -188,6 +232,11 @@ function driveHouseAgentIfNeeded(table) {
 async function handleAction(table, seatIndex, actionType, claim) {
   const { match } = table;
   if (!match) return { accepted: false, reason: "no_active_match" };
+
+  // The player acted — stop their turn timer. notifyCurrentTurn re-arms for the
+  // next turn; a rejected action re-arms below.
+  clearTimeout(table.turnTimer);
+  table.turnTimer = null;
 
   let result;
   try {
@@ -246,8 +295,9 @@ async function handleAction(table, seatIndex, actionType, claim) {
       if (match && match.currentTurnSeat === seatIndex && match.status !== "completed") {
         ws.send(JSON.stringify({
           event: "your_turn",
-          payload: { match_id: match.matchId, current_claim: match.currentClaim, time_limit_seconds: 30 },
+          payload: { match_id: match.matchId, current_claim: match.currentClaim, time_limit_seconds: TURN_LIMIT_SECONDS },
         }));
+        armTurnTimer(table); // still their turn — keep the clock running
       }
     }
   }
@@ -257,6 +307,12 @@ async function handleAction(table, seatIndex, actionType, claim) {
 
 async function finalizeMatch(table) {
   const { match } = table;
+  // The match is ending — stop any pending turn/disconnect timers.
+  clearTimeout(table.turnTimer);
+  table.turnTimer = null;
+  table.disconnectTimers.forEach((t) => clearTimeout(t));
+  table.disconnectTimers.clear();
+
   const { matchId, actionLog, standings } = match.finalize();
 
   const logPayload = {
@@ -435,6 +491,11 @@ wss.on("connection", (ws, req) => {
   const seat = table.seats.find((s) => !table.sockets.has(s.seatIndex));
   if (seat) {
     table.sockets.set(seat.seatIndex, ws);
+    // Reconnected within the grace window — cancel any pending forfeit.
+    if (table.disconnectTimers.has(seat.seatIndex)) {
+      clearTimeout(table.disconnectTimers.get(seat.seatIndex));
+      table.disconnectTimers.delete(seat.seatIndex);
+    }
   }
 
   startMatchIfReady(table);
@@ -449,7 +510,19 @@ wss.on("connection", (ws, req) => {
   });
 
   ws.on("close", () => {
-    if (seat) table.sockets.delete(seat.seatIndex);
+    if (!seat) return;
+    table.sockets.delete(seat.seatIndex);
+    const { match } = table;
+    // Live match + a real player → give a grace window to reconnect, else forfeit.
+    if (match && match.status !== "completed" && seat.agentId !== HOUSE_AGENT_ID) {
+      clearTimeout(table.disconnectTimers.get(seat.seatIndex));
+      const timer = setTimeout(() => {
+        if (table.match === match && match.status !== "completed" && !table.sockets.has(seat.seatIndex)) {
+          forfeitSeat(table, seat.seatIndex, "disconnected");
+        }
+      }, RECONNECT_GRACE_MS);
+      table.disconnectTimers.set(seat.seatIndex, timer);
+    }
   });
 });
 

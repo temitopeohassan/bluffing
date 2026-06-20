@@ -147,6 +147,20 @@ export class Match {
     };
   }
 
+  /**
+   * Forfeit a seat (left the table or timed out): zero their chips and drop
+   * them from active play. If it was their turn, move it to the next active
+   * seat. The match ends (isMatchOver) once one or fewer seats remain.
+   */
+  forfeit(seatIndex) {
+    this.chips[seatIndex] = 0;
+    const wasTheirTurn = this.currentTurnSeat === seatIndex;
+    this.activeSeats = this.activeSeats.filter((s) => s !== seatIndex && this.chips[s] > 0);
+    if (wasTheirTurn && this.activeSeats.length > 0) {
+      this.currentTurnSeat = this.activeSeats[0];
+    }
+  }
+
   _applyRoundResult(loserSeat, winnerSeat) {
     // Zero-sum transfer: the loser pays the winner. The winner gains exactly
     // what the loser can pay (≤100), so total chips at the table are conserved.

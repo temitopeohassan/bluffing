@@ -31,6 +31,7 @@ export interface MatchSocketState {
   } | null;
   pendingBluff: { callingSeat: number; claimantSeat: number; claim: Claim | null } | null;
   finalStandings: MatchStanding[] | null;
+  forfeit: { seatIndex: number; reason: string } | null;
   storageContentHash: string | null;
   chainTxHash: string | null;
   matchId: string | null;
@@ -50,6 +51,7 @@ const initialState: MatchSocketState = {
   lastReveal: null,
   pendingBluff: null,
   finalStandings: null,
+  forfeit: null,
   storageContentHash: null,
   chainTxHash: null,
   matchId: null,
@@ -152,6 +154,14 @@ export function useMatchSocket(websocketUrl: string | null) {
             storageContentHash: parsed.payload.storage_content_hash,
             chainTxHash: parsed.payload.chain_tx_hash,
             isYourTurn: false,
+          }));
+          break;
+        case "player_left":
+          // A player left or timed out — they forfeit. match_completed follows.
+          setState((s) => ({
+            ...s,
+            isYourTurn: false,
+            forfeit: { seatIndex: parsed.payload.seat_index, reason: parsed.payload.reason },
           }));
           break;
         case "action_rejected":

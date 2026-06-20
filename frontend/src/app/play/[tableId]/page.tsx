@@ -34,8 +34,10 @@ export default function TablePage() {
     myHand,
     currentClaim,
     isYourTurn,
+    timeLimitSeconds,
     lastReveal,
     finalStandings,
+    forfeit,
     storageContentHash,
     matchId,
     errorMessage,
@@ -59,7 +61,12 @@ export default function TablePage() {
             <p className="bf-mono text-[11px] uppercase tracking-wider text-slate-on-cream mb-2">
               Match complete
             </p>
-            <h1 className="font-display text-2xl text-ink mb-5">Final standings</h1>
+            <h1 className="font-display text-2xl text-ink mb-3">Final standings</h1>
+            {forfeit && (
+              <p className="text-sm text-ink/70 mb-4">
+                {nameFor(forfeit.seatIndex)} {forfeit.reason === "disconnected" ? "left the table" : "ran out of time"} — the match was awarded by forfeit.
+              </p>
+            )}
             <ol className="flex flex-col gap-2 mb-6">
               {finalStandings
                 .slice()
@@ -70,7 +77,7 @@ export default function TablePage() {
                     className="flex items-center justify-between border-b bf-hairline-cream pb-2 text-sm"
                   >
                     <span className="text-ink">
-                      #{s.placement} &middot; Seat {s.seatIndex}
+                      #{s.placement} &middot; {nameFor(s.seatIndex)}
                     </span>
                     <span className="bf-mono text-ink/60">{s.finalChips} chips</span>
                   </li>
@@ -182,6 +189,7 @@ export default function TablePage() {
               <ActionPanel
                 currentClaim={currentClaim}
                 isYourTurn={isYourTurn}
+                timeLimitSeconds={timeLimitSeconds}
                 errorMessage={errorMessage}
                 onSubmitClaim={(claim) => sendAction("claim", claim)}
                 onCallBluff={() => sendAction("bluff_call")}

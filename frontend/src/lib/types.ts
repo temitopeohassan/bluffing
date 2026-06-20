@@ -114,4 +114,5 @@ export type WSEvent =
       payload: { match_id: string; final_standings: MatchStanding[]; storage_content_hash: string | null; chain_tx_hash: string | null };
     }
   | { event: "action_rejected"; payload: { reason: string } }
+  | { event: "player_left"; payload: { match_id: string; seat_index: number; reason: string } }
   | { event: "error"; payload: { message: string } };
