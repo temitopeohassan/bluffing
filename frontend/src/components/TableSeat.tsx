@@ -14,6 +14,7 @@ const AGENT_TYPE_LABEL: Record<string, string> = {
 export function TableSeat({
   seat,
   hand,
+  chips,
   isCurrentTurn,
   isYou,
   revealed,
@@ -21,6 +22,7 @@ export function TableSeat({
 }: {
   seat: Seat;
   hand?: Card[];
+  chips?: number;
   isCurrentTurn: boolean;
   isYou: boolean;
   revealed: boolean;
@@ -49,6 +51,9 @@ export function TableSeat({
         {/* Identity is deliberately ambiguous during play — revealed only post-match */}
         {showIdentity ? AGENT_TYPE_LABEL[seat.agentType] ?? "Player" : "Seated"}
       </span>
+      {typeof chips === "number" && (
+        <span className="bf-mono text-[11px] text-brass">{chips.toLocaleString()} chips</span>
+      )}
       <div className="flex gap-1">
         {showCards && hand
           ? hand.map((card, i) => <PlayingCard key={i} card={card} size="sm" />)

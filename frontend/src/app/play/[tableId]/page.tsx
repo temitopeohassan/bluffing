@@ -30,6 +30,7 @@ export default function TablePage() {
   const {
     connected,
     seats,
+    chips,
     myHand,
     currentClaim,
     isYourTurn,
@@ -128,6 +129,7 @@ export default function TablePage() {
                     <TableSeat
                       key={seat.seatIndex}
                       seat={seat}
+                      chips={chips[seat.seatIndex]}
                       // Your own hand is visible all hand long; others only at a showdown.
                       hand={isYou ? myHand ?? undefined : lastReveal?.hands[seat.seatIndex]}
                       isCurrentTurn={isYourTurn && isYou}
@@ -160,8 +162,19 @@ export default function TablePage() {
                       ? "The claim was true across the table — the call was wrong."
                       : "The claim wasn’t there — the claimant was bluffing."}
                   </p>
-                  <p className="text-tell text-sm mt-1">
-                    {nameFor(lastReveal.roundLoserSeat)} {lastReveal.roundLoserSeat === seatIndex ? "lose" : "loses"} the round (−100 chips).
+                  <p className="text-sm mt-1">
+                    <span className="text-tell">
+                      {nameFor(lastReveal.roundLoserSeat)} {lastReveal.roundLoserSeat === seatIndex ? "lose" : "loses"} 100 chips
+                    </span>
+                    {lastReveal.roundWinnerSeat !== undefined && (
+                      <>
+                        {" → "}
+                        <span className="text-brass-bright">
+                          {nameFor(lastReveal.roundWinnerSeat)} {lastReveal.roundWinnerSeat === seatIndex ? "win" : "wins"} 100
+                        </span>
+                      </>
+                    )}
+                    .
                   </p>
                 </div>
               )}

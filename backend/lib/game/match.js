@@ -87,28 +87,35 @@ export class Match {
       return { accepted: false, reason: "no_standing_claim_to_call" };
     }
 
+    const claimantSeat = this.currentClaim.claimantSeat;
     const combinedHands = this.activeSeats.map((s) => this.hands[s]);
     const { claimHolds, loserSeat, evidence } = resolveBluffCall({
-      claimantSeat: this.currentClaim.claimantSeat,
+      claimantSeat,
       callingSeat: seatIndex,
       claim: this.currentClaim,
       combinedHands,
     });
+
+    // The showdown is a duel between the caller and the claimant — the winner
+    // is whichever of them didn't lose.
+    const winnerSeat = loserSeat === seatIndex ? claimantSeat : seatIndex;
 
     this._log("bluff_call", seatIndex, { claim: this.currentClaim });
     this._log("reveal", null, {
       hands: this.hands,
       claimHolds,
       loserSeat,
+      winnerSeat,
       evidence,
     });
 
-    this._applyRoundLoss(loserSeat);
+    this._applyRoundResult(loserSeat, winnerSeat);
 
     return {
       accepted: true,
       claimHolds,
       loserSeat,
+      winnerSeat,
       revealedHands: this.hands,
     };
   }
@@ -140,9 +147,14 @@ export class Match {
     };
   }
 
-  _applyRoundLoss(loserSeat) {
+  _applyRoundResult(loserSeat, winnerSeat) {
+    // Zero-sum transfer: the loser pays the winner. The winner gains exactly
+    // what the loser can pay (≤100), so total chips at the table are conserved.
     const penalty = Math.min(100, this.chips[loserSeat]);
     this.chips[loserSeat] -= penalty;
+    if (winnerSeat !== undefined && this.chips[winnerSeat] !== undefined) {
+      this.chips[winnerSeat] += penalty;
+    }
     this.activeSeats = this.activeSeats.filter((s) => this.chips[s] > 0);
   }
 

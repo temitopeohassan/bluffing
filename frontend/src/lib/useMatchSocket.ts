@@ -13,6 +13,7 @@ import { sounds } from "./sounds";
 export interface MatchSocketState {
   connected: boolean;
   seats: Seat[];
+  chips: Record<number, number>;
   myHand: Card[] | null;
   round: number;
   dealCommitmentHash: string | null;
@@ -23,6 +24,7 @@ export interface MatchSocketState {
     hands: Record<number, Card[]>;
     claimResult: "claim_held" | "claim_was_bluff";
     roundLoserSeat: number;
+    roundWinnerSeat?: number;
     callingSeat?: number;
     claimantSeat?: number;
     claim?: Claim | null;
@@ -38,6 +40,7 @@ export interface MatchSocketState {
 const initialState: MatchSocketState = {
   connected: false,
   seats: [],
+  chips: {},
   myHand: null,
   round: 0,
   dealCommitmentHash: null,
@@ -75,6 +78,7 @@ export function useMatchSocket(websocketUrl: string | null) {
             ...s,
             matchId: parsed.payload.match_id,
             seats: parsed.payload.seats,
+            chips: parsed.payload.chips ?? {},
             currentClaim: null,
             lastReveal: null,
           }));
@@ -127,10 +131,12 @@ export function useMatchSocket(websocketUrl: string | null) {
           sounds.reveal();
           setState((s) => ({
             ...s,
+            chips: parsed.payload.chips ?? s.chips,
             lastReveal: {
               hands: parsed.payload.hands,
               claimResult: parsed.payload.claim_result,
               roundLoserSeat: parsed.payload.round_loser_seat,
+              roundWinnerSeat: parsed.payload.round_winner_seat,
               callingSeat: s.pendingBluff?.callingSeat,
               claimantSeat: s.pendingBluff?.claimantSeat,
               claim: s.pendingBluff?.claim ?? null,

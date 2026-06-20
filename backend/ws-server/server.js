@@ -84,6 +84,7 @@ async function startMatchIfReady(table) {
     match_id: match.matchId,
     table_id: table.tableId,
     seats: table.seats,
+    chips: match.chips,
   });
 
   beginRound(table);
@@ -209,6 +210,8 @@ async function handleAction(table, seatIndex, actionType, claim) {
           hands: result.revealedHands,
           claim_result: result.claimHolds ? "claim_held" : "claim_was_bluff",
           round_loser_seat: result.loserSeat,
+          round_winner_seat: result.winnerSeat,
+          chips: match.chips,
         });
 
         if (match.isMatchOver()) {
