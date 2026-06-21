@@ -44,7 +44,10 @@ export default function PlayLobbyPage() {
   const walletReady = !!wallet.address && wallet.onCorrectChain;
 
   function handleJoinById() {
-    const id = tableIdInput.trim();
+    let id = tableIdInput.trim();
+    // Accept a pasted invite/play link too — pull the table id out of it.
+    const m = id.match(/\/(?:join|play)\/([^/?#\s]+)/);
+    if (m) id = decodeURIComponent(m[1]);
     if (id) router.push(`/join/${encodeURIComponent(id)}`);
   }
 
@@ -313,7 +316,7 @@ export default function PlayLobbyPage() {
           {/* Join a specific table by its ID */}
           <div className="mt-6 pt-5 border-t bf-hairline-cream">
             <span className="bf-mono text-[11px] uppercase tracking-wider text-slate-on-cream mb-1.5 block">
-              Have a table ID?
+              Have a table ID or invite link?
             </span>
             <div className="flex gap-2">
               <input
@@ -321,7 +324,7 @@ export default function PlayLobbyPage() {
                 value={tableIdInput}
                 onChange={(e) => setTableIdInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleJoinById()}
-                placeholder="Paste a table ID"
+                placeholder="Paste a table ID or invite link"
                 className="flex-1 border bf-hairline-cream rounded-sm px-3 py-2.5 bg-cream-dim text-ink placeholder:text-ink/30 focus:outline-none bf-mono text-sm"
               />
               <button
